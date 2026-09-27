@@ -1,0 +1,44 @@
+{
+  "name": "imaginus",
+  "productName": "ImaginUS",
+  "version": "0.1.0",
+  "description": "Toques combinados entre duas pessoas",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/renderer/app.js --bundle --format=esm --target=chrome130 --outfile=renderer/app.bundle.js",
+    "start": "npm run build && electron .",
+    "start:teste": "npm run build && electron . --perfil=teste",
+    "icons": "node scripts/make-icons.js",
+    "dist": "npm run build && electron-builder --win --publish never",
+    "release": "npm run build && electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "com.imaginus.app",
+    "productName": "ImaginUS",
+    "files": ["src/main.js", "src/preload.js", "renderer/**", "assets/**"],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "pedrohslopes345-wq",
+      "repo": "ImaginUS",
+      "releaseType": "release"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.0",
+    "firebase": "^11.0.2"
+  }
+}

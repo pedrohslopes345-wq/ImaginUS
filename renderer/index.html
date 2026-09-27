@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob: data:; img-src 'self' data:; connect-src https://*.googleapis.com wss://*.googleapis.com" />
+  <title>ImaginUS</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Carregando -->
+  <section data-view="loading" class="center">
+    <div class="spinner"></div>
+  </section>
+
+  <!-- Login -->
+  <section data-view="login" class="center" hidden>
+    <form id="login-form" class="card narrow">
+      <h1 class="brand">ImaginUS</h1>
+      <p class="muted">Toques combinados entre vocês dois.</p>
+      <label id="name-field" hidden>Seu nome
+        <input name="name" autocomplete="nickname" maxlength="30" />
+      </label>
+      <label>E-mail
+        <input name="email" type="email" autocomplete="email" required />
+      </label>
+      <label>Senha
+        <input name="password" type="password" autocomplete="current-password" minlength="6" required />
+      </label>
+      <p class="error" id="login-error"></p>
+      <button type="submit" class="primary" id="login-submit">Entrar</button>
+      <button type="button" class="link" id="login-toggle">Ainda não tenho conta</button>
+    </form>
+  </section>
+
+  <!-- Vincular -->
+  <section data-view="pair" class="center" hidden>
+    <div class="card narrow">
+      <h2>Vincular com a outra pessoa</h2>
+      <p class="muted small">Uma pessoa gera o código, a outra digita. Só precisa fazer uma vez.</p>
+
+      <div id="invite-start">
+        <button class="primary wide" id="invite-create">Gerar meu código</button>
+      </div>
+      <div id="invite-waiting" hidden>
+        <div class="code" id="invite-code">------</div>
+        <p class="muted small center-text">Esperando a outra pessoa digitar… (vale por 15 minutos)</p>
+        <button class="link" id="invite-cancel">Cancelar código</button>
+      </div>
+
+      <div class="divider"><span>ou</span></div>
+
+      <form id="invite-accept" class="row">
+        <input name="code" maxlength="6" placeholder="Código dela" autocomplete="off" required />
+        <button type="submit">Vincular</button>
+      </form>
+      <p class="error" id="pair-error"></p>
+      <button class="link" data-action="logout">Sair da conta</button>
+    </div>
+  </section>
+
+  <!-- Principal -->
+  <section data-view="main" class="main" hidden>
+    <header class="topbar">
+      <span class="brand small">ImaginUS</span>
+      <span class="muted small" id="partner-line"></span>
+    </header>
+
+    <div class="banner" id="update-banner" hidden>
+      <span>Versão <b id="update-version"></b> pronta.</span>
+      <button class="primary small-btn" id="update-install">Reiniciar e atualizar</button>
+    </div>
+
+    <div class="tab" data-tab="messages">
+      <p class="hint">Clique para enviar. <span class="star">★</span> vai no atalho <kbd id="hotkey-hint"></kbd></p>
+      <div class="grid" id="message-grid"></div>
+    </div>
+
+    <div class="tab" data-tab="dash" hidden>
+      <div class="segmented">
+        <button data-filter="received" class="active">Recebidos</button>
+        <button data-filter="sent">Enviados</button>
+      </div>
+      <ol class="dash" id="dash-list"></ol>
+    </div>
+
+    <div class="tab" data-tab="settings" hidden>
+      <div class="setting">
+        <label for="favorite-select">Mensagem do atalho</label>
+        <select id="favorite-select"></select>
+      </div>
+      <div class="setting">
+        <label>Atalho do teclado</label>
+        <div class="row">
+          <input id="hotkey-input" readonly />
+          <button id="hotkey-record">Alterar</button>
+        </div>
+        <p class="muted small" id="hotkey-help">Funciona com o app escondido. Evite Ctrl+Alt + teclas que viram símbolos no teclado ABNT2 (Q, W, E, /…).</p>
+      </div>
+      <div class="setting">
+        <label class="check"><input type="checkbox" id="autostart" /> Abrir junto com o Windows (escondido)</label>
+      </div>
+      <div class="setting">
+        <label>Conta</label>
+        <p class="muted small" id="account-line"></p>
+        <div class="row">
+          <button data-action="logout">Sair</button>
+          <button class="danger" id="unpair">Desvincular</button>
+        </div>
+      </div>
+      <div class="setting">
+        <label>Versão</label>
+        <div class="row">
+          <span class="muted small" id="version-line"></span>
+          <button id="update-check">Procurar atualização</button>
+        </div>
+      </div>
+    </div>
+
+    <nav class="tabbar">
+      <button data-go="messages" class="active">Mensagens</button>
+      <button data-go="dash">Dash <span class="dot" id="dash-dot" hidden></span></button>
+      <button data-go="settings">Ajustes</button>
+    </nav>
+  </section>
+
+  <!-- Editor de mensagem -->
+  <dialog id="editor">
+    <form method="dialog" id="editor-form">
+      <h3 id="editor-title">Nova mensagem</h3>
+      <label>Significado
+        <input name="label" maxlength="40" required placeholder="Ex.: Oi, Saudade, Tô chegando" />
+      </label>
+      <label>Som (poucos segundos, até 800 KB)
+        <input name="sound" type="file" accept="audio/*" />
+      </label>
+      <p class="muted small" id="editor-sound-note"></p>
+      <p class="error" id="editor-error"></p>
+      <div class="row end">
+        <button value="cancel" formnovalidate>Cancelar</button>
+        <button value="save" class="primary" id="editor-save">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Menu do cartão -->
+  <div class="menu" id="card-menu" hidden>
+    <button data-menu="play">Ouvir</button>
+    <button data-menu="favorite">Usar no atalho</button>
+    <button data-menu="edit">Editar</button>
+    <button data-menu="delete" class="danger">Excluir</button>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="app.bundle.js"></script>
+</body>
+</html>

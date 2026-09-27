@@ -1,0 +1,99 @@
+rules_version = '2';
+
+// Cole este arquivo inteiro em: Console do Firebase → Firestore Database → Regras → Publicar.
+//
+// Modelo de dados
+//   users/{uid}                  { name, pairId, favoriteMessageId }
+//   pairs/{codigo}               { members: [uidA, uidB], names: { uid: nome }, createdAt }
+//   pairs/{codigo}/messages/{id} { label, soundVersion, createdBy, createdAt }
+//   pairs/{codigo}/sounds/{id}   { data: bytes, mime, updatedAt }  (mesmo id da mensagem)
+//   pairs/{codigo}/events/{id}   { from, to, messageId, label, createdAt }
+//
+// O vínculo: quem gera o código cria pairs/{codigo} só com ele mesmo;
+// a outra pessoa tem 15 minutos para entrar. Depois disso ninguém mais entra.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    function pairPath(pairId) {
+      return /databases/$(database)/documents/pairs/$(pairId);
+    }
+
+    function isMember(pairId) {
+      return signedIn() && exists(pairPath(pairId)) && me() in get(pairPath(pairId)).data.members;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && me() == userId;
+      allow create: if signedIn() && me() == userId
+        && request.resource.data.keys().hasOnly(['name', 'createdAt']);
+      // Só dá para apontar pairId para um par do qual você faz parte (depois da escrita).
+      allow update: if signedIn() && me() == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pairId', 'favoriteMessageId'])
+        && (request.resource.data.get('pairId', null) == null
+            || me() in getAfter(pairPath(request.resource.data.pairId)).data.members);
+    }
+
+    match /pairs/{pairId} {
+      allow read: if signedIn() && me() in resource.data.members;
+
+      allow create: if signedIn()
+        && pairId.matches('^[A-HJ-NP-Z2-9]{6}$')
+        && request.resource.data.keys().hasOnly(['members', 'names', 'createdAt'])
+        && request.resource.data.members == [me()]
+        && request.resource.data.names.keys().hasOnly([me()])
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if signedIn() && (
+        // Entrar com o código
+        (resource.data.members.size() == 1
+          && !(me() in resource.data.members)
+          && request.time < resource.data.createdAt + duration.value(15, 'm')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'names'])
+          && request.resource.data.members == resource.data.members.concat([me()])
+          && request.resource.data.names.diff(resource.data.names).affectedKeys().hasOnly([me()]))
+        ||
+        // Desvincular (sair do par)
+        (me() in resource.data.members
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+          && request.resource.data.members == resource.data.members.removeAll([me()]))
+      );
+
+      // Cancelar um código que ninguém usou.
+      allow delete: if signedIn() && resource.data.members == [me()];
+
+      match /messages/{messageId} {
+        allow read, delete: if isMember(pairId);
+        allow create, update: if isMember(pairId)
+          && request.resource.data.label is string
+          && request.resource.data.label.size() > 0
+          && request.resource.data.label.size() <= 40;
+      }
+
+      match /sounds/{messageId} {
+        allow read, delete: if isMember(pairId);
+        allow create, update: if isMember(pairId)
+          && request.resource.data.data is bytes
+          && request.resource.data.data.size() <= 800 * 1024;
+      }
+
+      match /events/{eventId} {
+        allow read: if isMember(pairId);
+        allow create: if isMember(pairId)
+          && request.resource.data.keys().hasOnly(['from', 'to', 'messageId', 'label', 'createdAt'])
+          && request.resource.data.from == me()
+          && request.resource.data.to != me()
+          && request.resource.data.to in get(pairPath(pairId)).data.members
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
